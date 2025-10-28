@@ -10,7 +10,10 @@
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         <div id="ui-layer">
-            <div id="start-screen" class="ui-panel">
+            <div id="loading-screen" class="ui-panel">
+                <p>Loading your profile...</p>
+            </div>
+            <div id="start-screen" class="ui-panel hidden">
                 <h1>Gyro Bouncer</h1>
                 <p>Tilt your device to move the robot.</p>
                 <button id="start-button">Tap to Start</button>
@@ -26,6 +29,7 @@
             <div id="score-display" class="hidden">Score: <span id="score">0</span></div>
         </div>
     </div>
+    <script src="/websim/websim-socket.js"></script>
     <script type="importmap">
     {
         "imports": {

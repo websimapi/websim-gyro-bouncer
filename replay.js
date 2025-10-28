@@ -12,7 +12,12 @@ export class Replay {
         if (this.isPlaying) return;
 
         const frameData = {
-            player: { x: player.x, y: player.y, width: player.width, height: player.height },
+            player: { 
+                x: player.x, 
+                y: player.y, 
+                width: player.width, 
+                height: player.height,
+            },
             platforms: platforms.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height })),
             cameraY: cameraY,
             dt: deltaTime
