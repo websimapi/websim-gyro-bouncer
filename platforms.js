@@ -18,9 +18,9 @@ export class PlatformManager {
         this.canvasHeight = canvasHeight;
         this.platformImg = image;
         this.platforms = [];
-        this.platformWidth = 100;
-        this.minGap = 100;
-        this.maxGap = 200;
+        this.platformWidth = 80;
+        this.minGap = 50;
+        this.maxGap = 120;
         this.nextPlatformY = canvasHeight - 50;
     }
 
@@ -57,4 +57,3 @@ export class PlatformManager {
         }
     }
 }
-
