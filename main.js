@@ -208,7 +208,30 @@ function drawReplay(deltaTime) {
     // Draw player
     const playerFrame = frame.player;
     if (userAvatarImg && userAvatarImg.complete) {
-        replayCtx.drawImage(userAvatarImg, playerFrame.x, playerFrame.y, playerFrame.width, playerFrame.height);
+        replayCtx.save();
+
+        const scale = playerFrame.scale || 1;
+        const scaledWidth = playerFrame.width * scale;
+        const scaledHeight = playerFrame.height * scale;
+        const centerX = playerFrame.x + playerFrame.width / 2;
+        const centerY = playerFrame.y + playerFrame.height / 2;
+
+        // Create circular clipping path centered on the player
+        replayCtx.beginPath();
+        replayCtx.arc(centerX, centerY, playerFrame.width / 2, 0, Math.PI * 2, true);
+        replayCtx.closePath();
+        replayCtx.clip();
+
+        // Draw the image, centered and scaled from its center
+        replayCtx.drawImage(
+            userAvatarImg,
+            centerX - scaledWidth / 2,
+            centerY - scaledHeight / 2,
+            scaledWidth,
+            scaledHeight
+        );
+
+        replayCtx.restore();
     }
 
     replayCtx.restore();

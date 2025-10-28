@@ -17,6 +17,7 @@ export class Replay {
                 y: player.y, 
                 width: player.width, 
                 height: player.height,
+                scale: player.scale,
             },
             platforms: platforms.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height })),
             cameraY: cameraY,
