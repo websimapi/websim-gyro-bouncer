@@ -47,6 +47,16 @@ body, html {
     pointer-events: auto; /* Re-enable pointer events for these elements */
 }
 
+#replay-canvas {
+    width: 80%;
+    max-width: 300px;
+    aspect-ratio: 9 / 16;
+    background-color: #3d5a80;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border: 2px solid #98c1d9;
+}
+
 h1 {
     margin-top: 0;
     color: #ee6c4d;

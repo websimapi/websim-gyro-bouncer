@@ -1,7 +1,7 @@
-const GRAVITY = 0.3;
-const BOUNCE_VELOCITY = -10;
-const HORIZONTAL_SPEED = 0.5;
-const MAX_HORIZONTAL_SPEED = 5;
+const GRAVITY = 1200; // pixels/second^2
+const BOUNCE_VELOCITY = -600; // pixels/second
+const HORIZONTAL_SPEED = 12; // multiplier for tilt
+const MAX_HORIZONTAL_SPEED = 400; // pixels/second
 
 export class Player {
     constructor(x, y, image) {
@@ -14,15 +14,15 @@ export class Player {
         this.image = image;
     }
 
-    update(tilt, platforms, canvasWidth) {
+    update(tilt, platforms, canvasWidth, deltaTime) {
         // Horizontal movement
         this.vx = tilt * HORIZONTAL_SPEED;
         this.vx = Math.max(-MAX_HORIZONTAL_SPEED, Math.min(MAX_HORIZONTAL_SPEED, this.vx));
-        this.x += this.vx;
+        this.x += this.vx * deltaTime;
 
         // Apply gravity
-        this.vy += GRAVITY;
-        this.y += this.vy;
+        this.vy += GRAVITY * deltaTime;
+        this.y += this.vy * deltaTime;
 
         // Wall collision
         if (this.x < 0) this.x = 0;
