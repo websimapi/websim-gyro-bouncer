@@ -12,6 +12,7 @@ const restartButton = document.getElementById('restart-button');
 const scoreDisplay = document.getElementById('score-display');
 const scoreEl = document.getElementById('score');
 const finalScoreEl = document.getElementById('final-score');
+const highScoreEl = document.getElementById('high-score');
 
 let player, platformManager;
 let cameraY = 0;
@@ -59,6 +60,12 @@ function uiState(state) {
         scoreDisplay.classList.remove('hidden');
     } else if (state === 'over') {
         finalScoreEl.textContent = score;
+        let highScore = parseInt(localStorage.getItem('gyroBouncerHighScore')) || 0;
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('gyroBouncerHighScore', highScore);
+        }
+        highScoreEl.textContent = highScore;
         gameOverScreen.classList.remove('hidden');
     }
 }
@@ -117,4 +124,3 @@ restartButton.addEventListener('click', init);
 
 // Initial UI state
 uiState('start');
-
