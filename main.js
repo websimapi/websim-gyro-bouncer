@@ -13,7 +13,7 @@ const scoreDisplay = document.getElementById('score-display');
 const scoreEl = document.getElementById('score');
 const finalScoreEl = document.getElementById('final-score');
 
-let player, platformManager, controls;
+let player, platformManager;
 let cameraY = 0;
 let score = 0;
 let gameState = 'start';
@@ -22,6 +22,8 @@ const playerImg = new Image();
 playerImg.src = 'player.png';
 const platformImg = new Image();
 platformImg.src = 'platform.png';
+
+const controls = new Controls();
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -34,7 +36,6 @@ function init() {
     player = new Player(canvas.width / 2, canvas.height - 100, playerImg);
     platformManager = new PlatformManager(canvas.width, canvas.height, platformImg);
     platformManager.generateInitialPlatforms();
-    controls = new Controls();
     
     cameraY = 0;
     score = 0;
