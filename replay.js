@@ -1,32 +1,32 @@
-const REPLAY_BUFFER_SIZE = 300; // 5 seconds at 60fps
-
 export class Replay {
     constructor() {
         this.frames = [];
         this.isPlaying = false;
         this.playbackFrameIndex = 0;
+        this.endPauseCounter = 0;
+        this.endPauseDurationSeconds = 3;
+        this.playbackTime = 0;
     }
 
-    recordFrame(player, platforms, cameraY) {
+    recordFrame(player, platforms, cameraY, deltaTime) {
         if (this.isPlaying) return;
 
         const frameData = {
-            player: { x: player.x, y: player.y },
+            player: { x: player.x, y: player.y, width: player.width, height: player.height },
             platforms: platforms.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height })),
-            cameraY: cameraY
+            cameraY: cameraY,
+            dt: deltaTime
         };
 
         this.frames.push(frameData);
-
-        if (this.frames.length > REPLAY_BUFFER_SIZE) {
-            this.frames.shift();
-        }
     }
 
     startPlayback() {
         if (this.frames.length === 0) return;
         this.isPlaying = true;
         this.playbackFrameIndex = 0;
+        this.endPauseCounter = 0;
+        this.playbackTime = 0;
     }
 
     stopPlayback() {
@@ -34,16 +34,32 @@ export class Replay {
         this.frames = [];
     }
 
-    getPlaybackFrame() {
+    getPlaybackFrame(deltaTime) {
         if (!this.isPlaying || this.frames.length === 0) return null;
 
-        const frame = this.frames[this.playbackFrameIndex];
-        this.playbackFrameIndex++;
+        this.playbackTime += deltaTime;
+        
+        const totalDuration = this.frames.reduce((total, frame) => total + frame.dt, 0);
 
-        if (this.playbackFrameIndex >= this.frames.length) {
-            this.playbackFrameIndex = 0; // Loop the replay
+        if (totalDuration > 0 && this.playbackTime >= totalDuration) {
+            this.playbackTime %= totalDuration;
         }
+        
+        let cumulativeTime = 0;
+        let frameToDisplayIndex = 0; // Default to first frame
 
-        return frame;
+        for (let i = 0; i < this.frames.length; i++) {
+            cumulativeTime += this.frames[i].dt;
+            if (this.playbackTime < cumulativeTime) {
+                frameToDisplayIndex = i;
+                break;
+            }
+             // Handle case where playbackTime is exactly totalDuration or slightly off due to float precision
+            if (i === this.frames.length - 1) {
+                frameToDisplayIndex = i;
+            }
+        }
+        
+        return this.frames[frameToDisplayIndex];
     }
 }

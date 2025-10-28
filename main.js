@@ -78,7 +78,7 @@ function uiState(state) {
         highScoreEl.textContent = highScore;
         gameOverScreen.classList.remove('hidden');
         resizeCanvas(); // Ensure replay canvas is sized correctly when shown
-        replay.startPlayback();
+        replay.startPlayback(60); // Assuming 60fps, can be improved later
     }
 }
 
@@ -115,8 +115,8 @@ function draw() {
     ctx.restore();
 }
 
-function drawReplay() {
-    const frame = replay.getPlaybackFrame();
+function drawReplay(deltaTime) {
+    const frame = replay.getPlaybackFrame(deltaTime);
     if (!frame) return;
 
     replayCtx.clearRect(0, 0, replayCanvas.width, replayCanvas.height);
@@ -146,14 +146,15 @@ function gameLoop(timestamp) {
     }
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
+    const clampedDeltaTime = Math.min(deltaTime, 0.1);
 
     if (gameState === 'playing') {
         // Clamp deltaTime to avoid large jumps if tab is inactive for a while
-        update(Math.min(deltaTime, 0.1));
+        update(clampedDeltaTime);
         draw();
-        replay.recordFrame(player, platformManager.platforms, cameraY);
+        replay.recordFrame(player, platformManager.platforms, cameraY, clampedDeltaTime);
     } else if (gameState === 'gameOver' && replay.isPlaying) {
-        drawReplay();
+        drawReplay(clampedDeltaTime);
     }
     
     requestAnimationFrame(gameLoop);
