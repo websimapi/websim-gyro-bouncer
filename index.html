@@ -10,13 +10,13 @@
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         <div id="ui-layer">
-            <div id="start-screen">
+            <div id="start-screen" class="ui-panel">
                 <h1>Gyro Bouncer</h1>
                 <p>Tilt your device to move the robot.</p>
                 <button id="start-button">Tap to Start</button>
                 <p class="permission-info">You may need to grant motion sensor permissions.</p>
             </div>
-            <div id="game-over-screen" class="hidden">
+            <div id="game-over-screen" class="ui-panel hidden">
                 <h1>Game Over</h1>
                 <canvas id="replay-canvas"></canvas>
                 <p>Score: <span id="final-score">0</span></p>
