@@ -18,6 +18,7 @@ export class Player {
     }
 
     update(tilt, platforms, canvasWidth, deltaTime) {
+        let bounced = false;
         // Horizontal movement
         this.vx = tilt * HORIZONTAL_SPEED;
         this.vx = Math.max(-MAX_HORIZONTAL_SPEED, Math.min(MAX_HORIZONTAL_SPEED, this.vx));
@@ -52,10 +53,12 @@ export class Player {
                 ) {
                     this.vy = BOUNCE_VELOCITY;
                     this.bounceAnimTime = this.bounceAnimDuration; // Trigger bounce animation
+                    bounced = true;
                     break;
                 }
             }
         }
+        return bounced;
     }
 
     draw(ctx) {

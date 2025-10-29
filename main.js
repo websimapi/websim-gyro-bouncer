@@ -26,6 +26,9 @@ let score = 0;
 let gameState = 'start';
 let lastTime = 0;
 
+let audioCtx;
+let bounceSoundBuffer;
+
 const platformImg = new Image();
 platformImg.src = 'platform.png';
 
@@ -196,6 +199,27 @@ async function loadImageWithProxies(url) {
     return { image: null, source: 'failed' };
 }
 
+async function loadSound(url) {
+    if (!audioCtx) return null;
+    try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        return audioBuffer;
+    } catch (e) {
+        console.error(`Failed to load sound: ${url}`, e);
+        return null;
+    }
+}
+
+function playSound(buffer) {
+    if (!audioCtx || !buffer) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+}
+
 async function init() {
     if (avatarLoadFailed) {
         alert("Cannot start the game because your avatar failed to load. Please refresh the page.");
@@ -212,6 +236,11 @@ async function init() {
     platformManager = new PlatformManager(canvas.width, canvas.height, platformImg);
     platformManager.generateInitialPlatforms();
     replay = new Replay();
+
+    // Load sound on first init
+    if (audioCtx && !bounceSoundBuffer) {
+        bounceSoundBuffer = await loadSound('boing.mp3');
+    }
     
     cameraY = 0;
     score = 0;
@@ -252,7 +281,11 @@ function uiState(state) {
 
 function update(deltaTime) {
     const tilt = controls.getTilt();
-    player.update(tilt, platformManager.platforms, canvas.width, deltaTime);
+    const bounced = player.update(tilt, platformManager.platforms, canvas.width, deltaTime);
+
+    if (bounced) {
+        playSound(bounceSoundBuffer);
+    }
 
     // Camera follows player
     if (player.y < cameraY + canvas.height / 2.5) {
@@ -356,6 +389,12 @@ function gameLoop(timestamp) {
 
 startButton.addEventListener('click', () => {
     if (isDesktop) return; // Prevent desktop users from starting
+
+    // Initialize AudioContext on user interaction
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
     controls.requestPermission().then(granted => {
         if (granted) {
             init();
