@@ -2,6 +2,7 @@ import { Player } from './player.js';
 import { PlatformManager } from './platforms.js';
 import { Controls } from './controls.js';
 import { Replay } from './replay.js';
+import QRCode from 'qrcode';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -33,8 +34,27 @@ let avatarLoadFailed = false;
 
 const controls = new Controls();
 const AVATAR_CACHE_KEY = 'gyroBouncerAvatarCache';
+const isDesktop = !('ontouchstart' in window) && navigator.maxTouchPoints < 1;
+
+function setupDesktopUI() {
+    if (isDesktop) {
+        document.body.classList.add('is-desktop');
+        const qrCanvas = document.getElementById('qr-code');
+        if (qrCanvas) {
+             QRCode.toCanvas(qrCanvas, 'https://bouncer.on.websim.com', { width: 180, margin: 1 }, function (error) {
+                if (error) console.error(error);
+                console.log('QR code generated!');
+            });
+        }
+    }
+}
 
 async function preload() {
+    // On desktop, we don't need to load an avatar. This is now handled before main() is called.
+    if (isDesktop) {
+        return;
+    }
+
     uiState('loading');
     loadingStatus.textContent = 'Initializing...';
     let finalLoadingMessage = '';
@@ -109,6 +129,7 @@ async function preload() {
 }
 
 function main() {
+    // The desktop UI is now set up before this function is even called.
     // Preload assets and then show start screen
     preload();
     requestAnimationFrame(gameLoop);
@@ -334,6 +355,7 @@ function gameLoop(timestamp) {
 }
 
 startButton.addEventListener('click', () => {
+    if (isDesktop) return; // Prevent desktop users from starting
     controls.requestPermission().then(granted => {
         if (granted) {
             init();
@@ -348,5 +370,15 @@ restartButton.addEventListener('click', () => {
     init();
 });
 
-// Initial UI state
-main();
+// --- Initial Setup ---
+
+// Immediately setup for desktop or show loading for mobile
+if (isDesktop) {
+    setupDesktopUI();
+    uiState('start');
+    // We can just show the start screen and not run the game loop etc.
+    // No need to call main() for desktop.
+} else {
+    // For mobile, start the main game loading process
+    main();
+}

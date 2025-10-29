@@ -10,14 +10,21 @@
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         <div id="ui-layer">
-            <div id="loading-screen" class="ui-panel">
+            <div id="loading-screen" class="ui-panel hidden">
                 <p id="loading-status">Loading your profile...</p>
             </div>
             <div id="start-screen" class="ui-panel hidden">
                 <h1>Gyro Bouncer</h1>
-                <p>Tilt your device to move the robot.</p>
-                <button id="start-button">Tap to Start</button>
-                <p class="permission-info">You may need to grant motion sensor permissions.</p>
+                <div id="mobile-instructions">
+                    <p>Tilt your device to move the robot.</p>
+                    <button id="start-button">Tap to Start</button>
+                    <p class="permission-info">You may need to grant motion sensor permissions.</p>
+                </div>
+                <div id="desktop-instructions">
+                    <p>This game must be played on a mobile device.</p>
+                    <p>Scan the QR code to play on your phone.</p>
+                    <canvas id="qr-code"></canvas>
+                </div>
             </div>
             <div id="game-over-screen" class="ui-panel hidden">
                 <h1>Game Over</h1>
@@ -34,7 +41,8 @@
     {
         "imports": {
             "three": "https://esm.sh/three",
-            "nipplejs": "https://esm.sh/nipplejs"
+            "nipplejs": "https://esm.sh/nipplejs",
+            "qrcode": "https://esm.sh/qrcode"
         }
     }
     </script>
