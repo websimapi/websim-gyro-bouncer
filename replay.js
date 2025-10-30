@@ -8,7 +8,7 @@ export class Replay {
         this.playbackTime = 0;
     }
 
-    recordFrame(player, platforms, cameraY, deltaTime) {
+    recordFrame(player, platforms, cameraY, deltaTime, ground) {
         if (this.isPlaying) return;
 
         const frameData = {
@@ -27,6 +27,12 @@ export class Replay {
                 width: p.width,
                 height: p.height
             })),
+            ground: ground ? {
+                x: ground.position.x - ground.bounds.max.x + ground.position.x,
+                y: ground.position.y - (ground.bounds.max.y - ground.bounds.min.y) / 2,
+                width: ground.bounds.max.x - ground.bounds.min.x,
+                height: ground.bounds.max.y - ground.bounds.min.y
+            } : null,
             cameraY: cameraY,
             dt: deltaTime
         };

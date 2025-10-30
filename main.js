@@ -26,6 +26,10 @@ let engine;
 const restitution = 3.0; // Bounciness
 
 let player, platformManager, replay;
+let ground, groundImg;
+let inSafeZone = true;
+const SAFE_ZONE_SCORE = 50;
+
 let cameraY = 0;
 let score = 0;
 let gameState = 'start';
@@ -129,14 +133,23 @@ async function preload() {
     
     if (!avatarLoadFailed) {
         loadingStatus.textContent = "Loading game assets...";
-        await new Promise((resolve) => {
-            if (platformImg.complete) {
-                resolve();
-            } else {
-                platformImg.onload = () => resolve();
-                platformImg.onerror = () => resolve(); // continue even if it fails
-            }
-        });
+        groundImg = new Image();
+        groundImg.src = 'ground.png';
+
+        const assetsToLoad = [platformImg, groundImg];
+        await Promise.all(assetsToLoad.map(img => {
+            return new Promise((resolve) => {
+                if (img.complete) {
+                    resolve();
+                } else {
+                    img.onload = () => resolve();
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${img.src}`);
+                        resolve(); // continue even if it fails
+                    };
+                }
+            });
+        }));
 
         // give a small delay for user to read final message
         loadingStatus.textContent += ' Ready!';
@@ -251,6 +264,28 @@ async function init() {
     engine.world.gravity.y = 1.2;
     engine.world.gravity.x = 0;
     
+    // Clear old ground if it exists
+    if (ground) {
+        Matter.World.remove(engine.world, ground);
+        ground = null;
+    }
+
+    inSafeZone = true;
+    const groundHeight = 60;
+    ground = Matter.Bodies.rectangle(
+        canvas.width / 2, 
+        canvas.height - groundHeight / 2, 
+        canvas.width, 
+        groundHeight, 
+        { 
+            isStatic: true, 
+            label: 'ground',
+            friction: 0.5,
+        }
+    );
+    Matter.World.add(engine.world, ground);
+
+
     // Logic for one-way platforms
     Matter.Events.on(engine, 'beforeUpdate', (event) => {
         if (!player || !platformManager) return;
@@ -353,19 +388,55 @@ function update(deltaTime) {
     // Update engine
     Matter.Engine.update(engine, deltaTime * 1000); // Matter.js expects milliseconds
 
-    // Camera follows player
-    if (player.body.position.y < cameraY + canvas.height / 2.5) {
-        cameraY = player.body.position.y - canvas.height / 2.5;
+    // --- Camera follows player (with smoothing) ---
+    const cameraTopThreshold = cameraY + canvas.height * 0.4;
+    const cameraCenter = cameraY + canvas.height * 0.5;
+
+    let targetCameraY = cameraY;
+
+    if (player.body.position.y < cameraTopThreshold) {
+        // Target for moving up
+        targetCameraY = player.body.position.y - canvas.height * 0.4;
+    } 
+    
+    if (inSafeZone) {
+        // In safe zone, if player is falling and below center, target should also follow them down.
+        if (player.body.velocity.y > 0 && player.body.position.y > cameraCenter) {
+            targetCameraY = player.body.position.y - canvas.height * 0.5;
+        }
+    }
+    
+    // Smoothly interpolate camera position towards the target
+    // Clamp target to not go below ground
+    targetCameraY = Math.min(targetCameraY, 0); // Allow camera to move up (negative Y) but not down past 0.
+    
+    // The smoothing factor determines how quickly the camera catches up to the target.
+    // A smaller value means slower, smoother movement.
+    const smoothingFactor = 0.08; 
+    cameraY += (targetCameraY - cameraY) * smoothingFactor;
+
+    // Snap to 0 if very close to prevent floating point drift
+    if (Math.abs(cameraY) < 0.1) {
+        cameraY = 0;
     }
     
     // Update score
     score = Math.max(score, Math.floor(-cameraY / 10));
     scoreEl.textContent = score;
 
+    // Check for exiting the safe zone
+    if (inSafeZone && score >= SAFE_ZONE_SCORE) {
+        inSafeZone = false;
+        if (ground) {
+            Matter.World.remove(engine.world, ground);
+            ground = null;
+        }
+    }
+
     platformManager.update(cameraY, player.body.position.y);
     
     // Game over condition
-    if (player.body.position.y > cameraY + canvas.height) {
+    if (!inSafeZone && player.body.position.y > cameraY + canvas.height + player.height) {
         gameState = 'gameOver';
         uiState('over');
     }
@@ -377,6 +448,14 @@ function draw() {
     ctx.translate(0, -cameraY);
 
     platformManager.draw(ctx);
+    
+    if (ground && groundImg.complete) {
+        const pos = ground.position;
+        const width = canvas.width;
+        const height = 60;
+        ctx.drawImage(groundImg, pos.x - width / 2, pos.y - height / 2, width, height);
+    }
+
     player.draw(ctx);
 
     ctx.restore();
@@ -398,6 +477,12 @@ function drawReplay(deltaTime) {
     // Draw platforms
     for (const p of frame.platforms) {
         replayCtx.drawImage(platformImg, p.x, p.y, p.width, p.height);
+    }
+
+    // Draw ground if it existed in the frame
+    if (frame.ground && groundImg.complete) {
+        const g = frame.ground;
+        replayCtx.drawImage(groundImg, g.x, g.y, g.width, g.height);
     }
 
     // Draw player
@@ -441,7 +526,7 @@ function gameLoop(timestamp) {
         // Clamp deltaTime to avoid large jumps if tab is inactive for a while
         update(clampedDeltaTime);
         draw();
-        replay.recordFrame(player, platformManager.platforms, cameraY, clampedDeltaTime);
+        replay.recordFrame(player, platformManager.platforms, cameraY, clampedDeltaTime, ground);
     } else if (gameState === 'gameOver' && replay.isPlaying) {
         drawReplay(clampedDeltaTime);
     }

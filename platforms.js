@@ -48,9 +48,10 @@ export class PlatformManager {
         this.platforms.forEach(p => p.destroy(this.world));
         this.platforms = [];
 
-        // Starting platform
-        this.addPlatform(this.canvasWidth / 2 - this.platformWidth / 2, this.canvasHeight - 50);
-        this.nextPlatformY = this.canvasHeight - 50;
+        // Starting platform is now the ground, so generate the first one higher up
+        this.nextPlatformY = this.canvasHeight - 200;
+        this.addPlatform(this.canvasWidth / 2 - this.platformWidth / 2, this.nextPlatformY);
+
 
         for (let i = 0; i < 20; i++) {
             this.generatePlatform();
