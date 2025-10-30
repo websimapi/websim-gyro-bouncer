@@ -34,13 +34,15 @@ export async function preload(gameControls) {
     }
     userAvatarImg = loadedAvatar;
 
-    const { platformImg: pImg, groundImg: gImg, platformCracked1Img, platformCracked2Img } = await Loader.loadGameImages(UI.updateLoadingStatus);
+    const { platformImg: pImg, groundImg: gImg, platformCracked1Img, platformCracked2Img, spikyPlatformImg, spikesImg } = await Loader.loadGameImages(UI.updateLoadingStatus);
     platformImg = pImg;
     groundImg = gImg;
     platformImages = {
         normal: pImg,
         cracked1: platformCracked1Img,
         cracked2: platformCracked2Img,
+        spiky: spikyPlatformImg,
+        spikes: spikesImg
     };
     
     UI.showScreen('start');
@@ -96,7 +98,10 @@ function setupPhysics() {
                 if (playerBody.velocity.y > 1) {
                     playSound(bounceSoundBuffer);
                     if (platformBody.parentObject) {
-                        platformBody.parentObject.onHit(score);
+                        // Prevent breaking spiky platforms
+                        if (!platformBody.parentObject.isSpiky) {
+                            platformBody.parentObject.onHit(score);
+                        }
                     }
                 }
             }
@@ -155,6 +160,29 @@ function update(deltaTime) {
     }
 
     Matter.Engine.update(engine, deltaTime * 1000);
+
+    // Spike collision check
+    for (const p of platformManager.platforms) {
+        if (p.isSpiky && p.spikesOut) {
+            const playerBounds = player.body.bounds;
+            const platformBody = p.body;
+            const spikeHeight = p.width * (platformImages.spikes.naturalHeight / platformImages.spikes.naturalWidth);
+            
+            const spikeBounds = {
+                min: { x: platformBody.position.x - p.width / 2, y: platformBody.position.y - p.height / 2 - spikeHeight },
+                max: { x: platformBody.position.x + p.width / 2, y: platformBody.position.y - p.height / 2 }
+            };
+
+            if (playerBounds.max.x > spikeBounds.min.x &&
+                playerBounds.min.x < spikeBounds.max.x &&
+                playerBounds.max.y > spikeBounds.min.y &&
+                playerBounds.min.y < spikeBounds.max.y) {
+                    gameState = 'gameOver';
+                    UI.showScreen('over', score, replay);
+                    return; // Exit update loop early
+            }
+        }
+    }
 
     camera.update(player, inSafeZone);
     const cameraY = camera.getY();

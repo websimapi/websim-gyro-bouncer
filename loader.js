@@ -122,8 +122,12 @@ export async function loadGameImages(updateStatus) {
     platformCracked1Img.src = 'platform_cracked1.png';
     const platformCracked2Img = new Image();
     platformCracked2Img.src = 'platform_cracked2.png';
+    const spikyPlatformImg = new Image();
+    spikyPlatformImg.src = 'spiky_platform.png';
+    const spikesImg = new Image();
+    spikesImg.src = 'spikes.png';
 
-    const assetsToLoad = [platformImg, groundImg, platformCracked1Img, platformCracked2Img];
+    const assetsToLoad = [platformImg, groundImg, platformCracked1Img, platformCracked2Img, spikyPlatformImg, spikesImg];
     await Promise.all(assetsToLoad.map(img => {
         return new Promise((resolve) => {
             if (img.complete) {
@@ -140,7 +144,7 @@ export async function loadGameImages(updateStatus) {
 
     updateStatus("Loading game assets... Ready!");
     await new Promise(resolve => setTimeout(resolve, 1500));
-    return { platformImg, groundImg, platformCracked1Img, platformCracked2Img };
+    return { platformImg, groundImg, platformCracked1Img, platformCracked2Img, spikyPlatformImg, spikesImg };
 }
 
 export async function loadSound(audioCtx, url) {
