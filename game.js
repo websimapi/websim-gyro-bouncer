@@ -1,0 +1,227 @@
+import Matter from 'https://esm.sh/matter-js';
+import { Player } from './player.js';
+import { PlatformManager } from './platforms.js';
+import { Replay } from './replay.js';
+import { Camera } from './camera.js';
+import * as UI from './ui.js';
+import * as Loader from './loader.js';
+
+// Game constants
+const restitution = 3.0;
+const SAFE_ZONE_SCORE = 50;
+
+// Game state variables
+let engine, world;
+let player, platformManager, replay, camera;
+let ground, groundImg, platformImg, userAvatarImg;
+let inSafeZone = true;
+let score = 0;
+let gameState = 'loading';
+let lastTime = 0;
+let controls;
+let audioCtx;
+let bounceSoundBuffer;
+
+export async function preload(gameControls) {
+    controls = gameControls;
+    UI.showScreen('loading');
+    const { userAvatarImg: loadedAvatar, avatarLoadFailed } = await Loader.loadAvatar(UI.updateLoadingStatus);
+    
+    if (avatarLoadFailed) {
+        gameState = 'error';
+        return;
+    }
+    userAvatarImg = loadedAvatar;
+
+    const { platformImg: pImg, groundImg: gImg } = await Loader.loadGameImages(UI.updateLoadingStatus);
+    platformImg = pImg;
+    groundImg = gImg;
+    
+    UI.showScreen('start');
+    gameState = 'start';
+}
+
+function playSound(buffer) {
+    if (!audioCtx || !buffer) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+}
+
+function setupPhysics() {
+    engine = Matter.Engine.create();
+    world = engine.world;
+    world.gravity.y = 1.2;
+    world.gravity.x = 0;
+
+    Matter.Events.on(engine, 'beforeUpdate', () => {
+        if (!player || !platformManager) return;
+        const playerBody = player.body;
+        const playerBottom = playerBody.position.y + player.radius;
+
+        platformManager.platforms.forEach(platform => {
+            const platformTop = platform.body.position.y - platform.height / 2;
+            if (playerBody.velocity.y > 0 && playerBottom < platformTop + 5) {
+                platform.body.isSensor = false;
+            } else if (playerBody.velocity.y <= 0) {
+                platform.body.isSensor = true;
+            }
+        });
+    });
+
+    Matter.Events.on(engine, 'collisionStart', (event) => {
+        for (const pair of event.pairs) {
+            const isPlayerPlatform = (pair.bodyA.label === 'player' && pair.bodyB.label === 'platform') || (pair.bodyB.label === 'player' && pair.bodyA.label === 'platform');
+            if (isPlayerPlatform) {
+                const playerBody = pair.bodyA.label === 'player' ? pair.bodyA : pair.bodyB;
+                if (playerBody.velocity.y > 1) {
+                    playSound(bounceSoundBuffer);
+                }
+            }
+        }
+    });
+}
+
+export async function init() {
+    if (gameState === 'error' || !userAvatarImg) {
+        alert("Cannot start the game due to a loading error. Please refresh the page.");
+        return;
+    }
+
+    lastTime = 0;
+    setupPhysics();
+
+    inSafeZone = true;
+    const groundHeight = 60;
+    ground = Matter.Bodies.rectangle(UI.canvas.width / 2, UI.canvas.height - groundHeight / 2, UI.canvas.width, groundHeight, { isStatic: true, label: 'ground', friction: 0.5 });
+    Matter.World.add(world, ground);
+
+    player = new Player(UI.canvas.width / 2, UI.canvas.height - 100, userAvatarImg, world, { restitution });
+    platformManager = new PlatformManager(UI.canvas.width, UI.canvas.height, platformImg, world, { restitution });
+    platformManager.generateInitialPlatforms();
+    replay = new Replay();
+    camera = new Camera(UI.canvas.height);
+
+    if (audioCtx && !bounceSoundBuffer) {
+        bounceSoundBuffer = await Loader.loadSound(audioCtx, 'boing.mp3');
+    }
+    
+    score = 0;
+    UI.updateScore(0);
+    
+    UI.showScreen('game');
+    if (gameState !== 'playing') {
+        gameState = 'playing';
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function update(deltaTime) {
+    player.update(controls.getTilt(), UI.canvas.width, deltaTime);
+    Matter.Engine.update(engine, deltaTime * 1000);
+
+    camera.update(player, inSafeZone);
+    const cameraY = camera.getY();
+
+    score = Math.max(score, Math.floor(-cameraY / 10));
+    UI.updateScore(score);
+
+    if (inSafeZone && score >= SAFE_ZONE_SCORE) {
+        inSafeZone = false;
+        if (ground) {
+            Matter.World.remove(world, ground);
+            ground = null;
+        }
+    }
+
+    platformManager.update(cameraY, player.body.position.y);
+    
+    if (!inSafeZone && player.body.position.y > cameraY + UI.canvas.height + player.height) {
+        gameState = 'gameOver';
+        UI.showScreen('over', score, replay);
+    }
+}
+
+function draw() {
+    const ctx = UI.canvas.getContext('2d');
+    const cameraY = camera.getY();
+    ctx.clearRect(0, 0, UI.canvas.width, UI.canvas.height);
+    ctx.save();
+    ctx.translate(0, -cameraY);
+
+    platformManager.draw(ctx);
+    
+    if (ground && groundImg.complete) {
+        const pos = ground.position;
+        const width = UI.canvas.width;
+        const height = 60;
+        ctx.drawImage(groundImg, pos.x - width / 2, pos.y - height / 2, width, height);
+    }
+
+    player.draw(ctx);
+    ctx.restore();
+}
+
+function drawReplay(deltaTime) {
+    const frame = replay.getPlaybackFrame(deltaTime);
+    if (!frame) return;
+
+    UI.replayCtx.clearRect(0, 0, UI.replayCanvas.width, UI.replayCanvas.height);
+    
+    const scale = UI.replayCanvas.width / UI.canvas.width;
+    UI.replayCtx.save();
+    UI.replayCtx.scale(scale, scale);
+    UI.replayCtx.translate(0, -frame.cameraY);
+
+    for (const p of frame.platforms) {
+        UI.replayCtx.drawImage(platformImg, p.x, p.y, p.width, p.height);
+    }
+
+    if (frame.ground && groundImg.complete) {
+        const g = frame.ground;
+        UI.replayCtx.drawImage(groundImg, g.x, g.y, g.width, g.height);
+    }
+
+    const playerFrame = frame.player;
+    if (userAvatarImg && userAvatarImg.complete) {
+        UI.replayCtx.save();
+        UI.replayCtx.translate(playerFrame.x, playerFrame.y);
+        UI.replayCtx.rotate(playerFrame.angle);
+
+        UI.replayCtx.beginPath();
+        UI.replayCtx.arc(0, 0, playerFrame.radius, 0, Math.PI * 2, true);
+        UI.replayCtx.closePath();
+        UI.replayCtx.clip();
+
+        UI.replayCtx.drawImage(userAvatarImg, -playerFrame.radius, -playerFrame.radius, playerFrame.width, playerFrame.height);
+        UI.replayCtx.restore();
+    }
+
+    UI.replayCtx.restore();
+}
+
+
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const deltaTime = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    const clampedDeltaTime = Math.min(deltaTime, 0.1);
+
+    if (gameState === 'playing') {
+        update(clampedDeltaTime);
+        draw();
+        replay.recordFrame(player, platformManager.platforms, camera.getY(), clampedDeltaTime, ground);
+    } else if (gameState === 'gameOver' && replay.isPlaying) {
+        drawReplay(clampedDeltaTime);
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+export function createAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
