@@ -68,6 +68,16 @@ function setupPhysics() {
                 platform.body.isSensor = true;
             }
         });
+
+        if (ground) {
+             const playerBottom = player.body.position.y + player.radius;
+             const groundTop = ground.position.y - 30; // ground height is 60
+             if (player.body.velocity.y >= 0 && playerBottom < groundTop + 10) {
+                 ground.isSensor = false;
+             } else {
+                 ground.isSensor = true;
+             }
+        }
     });
 
     Matter.Events.on(engine, 'collisionStart', (event) => {
@@ -119,6 +129,20 @@ export async function init() {
 
 function update(deltaTime) {
     player.update(controls.getTilt(), UI.canvas.width, deltaTime);
+
+    // Gravity inversion logic
+    if (ground) {
+        const groundTopY = ground.position.y - 30; // ground is 60px high
+        if (player.body.position.y > groundTopY) {
+            world.gravity.y = -1.2;
+        } else {
+            world.gravity.y = 1.2;
+        }
+    } else {
+        // When ground is removed, ensure gravity is normal
+        world.gravity.y = 1.2;
+    }
+
     Matter.Engine.update(engine, deltaTime * 1000);
 
     camera.update(player, inSafeZone);
