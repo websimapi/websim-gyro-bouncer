@@ -3,6 +3,7 @@ import { PlatformManager } from './platforms.js';
 import { Controls } from './controls.js';
 import { Replay } from './replay.js';
 import QRCode from 'qrcode';
+import Matter from 'https://esm.sh/matter-js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -19,6 +20,10 @@ const scoreDisplay = document.getElementById('score-display');
 const scoreEl = document.getElementById('score');
 const finalScoreEl = document.getElementById('final-score');
 const highScoreEl = document.getElementById('high-score');
+
+// --- Matter.js setup ---
+let engine;
+const restitution = 3.0; // Bounciness
 
 let player, platformManager, replay;
 let cameraY = 0;
@@ -123,6 +128,16 @@ async function preload() {
     }
     
     if (!avatarLoadFailed) {
+        loadingStatus.textContent = "Loading game assets...";
+        await new Promise((resolve) => {
+            if (platformImg.complete) {
+                resolve();
+            } else {
+                platformImg.onload = () => resolve();
+                platformImg.onerror = () => resolve(); // continue even if it fails
+            }
+        });
+
         // give a small delay for user to read final message
         loadingStatus.textContent += ' Ready!';
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -231,9 +246,61 @@ async function init() {
         return;
     }
 
-    player = new Player(canvas.width / 2, canvas.height - 100, userAvatarImg);
-    player.image = userAvatarImg; // Ensure player's image is the loaded avatar
-    platformManager = new PlatformManager(canvas.width, canvas.height, platformImg);
+    // --- Initialize Physics Engine ---
+    engine = Matter.Engine.create();
+    engine.world.gravity.y = 1.2;
+    engine.world.gravity.x = 0;
+    
+    // Logic for one-way platforms
+    Matter.Events.on(engine, 'beforeUpdate', (event) => {
+        if (!player || !platformManager) return;
+        
+        const playerBody = player.body;
+        const playerBottom = playerBody.position.y + player.radius;
+
+        platformManager.platforms.forEach(platform => {
+            const platformTop = platform.body.position.y - platform.height / 2;
+            
+            // Player is moving down OR player is already above the platform
+            // Make platform solid
+            if (playerBody.velocity.y > 0 && playerBottom < platformTop + 5) {
+                 platform.body.isSensor = false;
+            } 
+            // Player is moving up
+            // Make platform passable
+            else if (playerBody.velocity.y <= 0) {
+                platform.body.isSensor = true;
+            }
+        });
+    });
+
+    // Custom collision handler for bounce sound
+    Matter.Events.on(engine, 'collisionStart', (event) => {
+        const pairs = event.pairs;
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i];
+            
+            let playerBody, platformBody;
+
+            if (pair.bodyA.label === 'player' && pair.bodyB.label === 'platform') {
+                playerBody = pair.bodyA;
+                platformBody = pair.bodyB;
+            } else if (pair.bodyB.label === 'player' && pair.bodyA.label === 'platform') {
+                playerBody = pair.bodyB;
+                platformBody = pair.bodyA;
+            } else {
+                continue;
+            }
+            
+            // Only play sound on downward collision
+            if (playerBody.velocity.y > 1) { // Check for significant downward velocity
+                 playSound(bounceSoundBuffer);
+            }
+        }
+    });
+
+    player = new Player(canvas.width / 2, canvas.height - 100, userAvatarImg, engine.world, { restitution });
+    platformManager = new PlatformManager(canvas.width, canvas.height, platformImg, engine.world, { restitution });
     platformManager.generateInitialPlatforms();
     replay = new Replay();
 
@@ -281,25 +348,24 @@ function uiState(state) {
 
 function update(deltaTime) {
     const tilt = controls.getTilt();
-    const bounced = player.update(tilt, platformManager.platforms, canvas.width, deltaTime);
+    player.update(tilt, canvas.width, deltaTime);
 
-    if (bounced) {
-        playSound(bounceSoundBuffer);
-    }
+    // Update engine
+    Matter.Engine.update(engine, deltaTime * 1000); // Matter.js expects milliseconds
 
     // Camera follows player
-    if (player.y < cameraY + canvas.height / 2.5) {
-        cameraY = player.y - canvas.height / 2.5;
+    if (player.body.position.y < cameraY + canvas.height / 2.5) {
+        cameraY = player.body.position.y - canvas.height / 2.5;
     }
     
     // Update score
     score = Math.max(score, Math.floor(-cameraY / 10));
     scoreEl.textContent = score;
 
-    platformManager.update(cameraY);
+    platformManager.update(cameraY, player.body.position.y);
     
     // Game over condition
-    if (player.y > cameraY + canvas.height) {
+    if (player.body.position.y > cameraY + canvas.height) {
         gameState = 'gameOver';
         uiState('over');
     }
@@ -338,26 +404,22 @@ function drawReplay(deltaTime) {
     const playerFrame = frame.player;
     if (userAvatarImg && userAvatarImg.complete) {
         replayCtx.save();
+        replayCtx.translate(playerFrame.x, playerFrame.y);
+        replayCtx.rotate(playerFrame.angle);
 
-        const scale = playerFrame.scale || 1;
-        const scaledWidth = playerFrame.width * scale;
-        const scaledHeight = playerFrame.height * scale;
-        const centerX = playerFrame.x + playerFrame.width / 2;
-        const centerY = playerFrame.y + playerFrame.height / 2;
-
-        // Create circular clipping path centered on the player
+        // Create circular clipping path
         replayCtx.beginPath();
-        replayCtx.arc(centerX, centerY, playerFrame.width / 2, 0, Math.PI * 2, true);
+        replayCtx.arc(0, 0, playerFrame.radius, 0, Math.PI * 2, true);
         replayCtx.closePath();
         replayCtx.clip();
 
-        // Draw the image, centered and scaled from its center
+        // Draw the image, centered
         replayCtx.drawImage(
             userAvatarImg,
-            centerX - scaledWidth / 2,
-            centerY - scaledHeight / 2,
-            scaledWidth,
-            scaledHeight
+            -playerFrame.radius,
+            -playerFrame.radius,
+            playerFrame.width,
+            playerFrame.height
         );
 
         replayCtx.restore();

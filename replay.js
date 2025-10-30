@@ -12,14 +12,21 @@ export class Replay {
         if (this.isPlaying) return;
 
         const frameData = {
-            player: { 
-                x: player.x, 
-                y: player.y, 
-                width: player.width, 
+            player: {
+                x: player.body.position.x,
+                y: player.body.position.y,
+                angle: player.body.angle,
+                width: player.width,
                 height: player.height,
+                radius: player.radius,
                 scale: player.scale,
             },
-            platforms: platforms.map(p => ({ x: p.x, y: p.y, width: p.width, height: p.height })),
+            platforms: platforms.map(p => ({
+                x: p.body.position.x - p.width / 2,
+                y: p.body.position.y - p.height / 2,
+                width: p.width,
+                height: p.height
+            })),
             cameraY: cameraY,
             dt: deltaTime
         };
