@@ -25,7 +25,10 @@ export class Replay {
                 x: p.body.position.x - p.width / 2,
                 y: p.body.position.y - p.height / 2,
                 width: p.width,
-                height: p.height
+                height: p.height,
+                isBreakable: p.isBreakable,
+                hits: p.hits,
+                maxHits: p.maxHits
             })),
             ground: ground ? {
                 x: ground.position.x - ground.bounds.max.x + ground.position.x,

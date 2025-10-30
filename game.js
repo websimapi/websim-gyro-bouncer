@@ -14,6 +14,7 @@ const SAFE_ZONE_SCORE = 50;
 let engine, world;
 let player, platformManager, replay, camera;
 let ground, groundImg, platformImg, userAvatarImg;
+let platformImages;
 let inSafeZone = true;
 let score = 0;
 let gameState = 'loading';
@@ -33,9 +34,14 @@ export async function preload(gameControls) {
     }
     userAvatarImg = loadedAvatar;
 
-    const { platformImg: pImg, groundImg: gImg } = await Loader.loadGameImages(UI.updateLoadingStatus);
+    const { platformImg: pImg, groundImg: gImg, platformCracked1Img, platformCracked2Img } = await Loader.loadGameImages(UI.updateLoadingStatus);
     platformImg = pImg;
     groundImg = gImg;
+    platformImages = {
+        normal: pImg,
+        cracked1: platformCracked1Img,
+        cracked2: platformCracked2Img,
+    };
     
     UI.showScreen('start');
     gameState = 'start';
@@ -85,8 +91,13 @@ function setupPhysics() {
             const isPlayerPlatform = (pair.bodyA.label === 'player' && pair.bodyB.label === 'platform') || (pair.bodyB.label === 'player' && pair.bodyA.label === 'platform');
             if (isPlayerPlatform) {
                 const playerBody = pair.bodyA.label === 'player' ? pair.bodyA : pair.bodyB;
+                const platformBody = pair.bodyA.label === 'platform' ? pair.bodyA : pair.bodyB;
+                
                 if (playerBody.velocity.y > 1) {
                     playSound(bounceSoundBuffer);
+                    if (platformBody.parentObject) {
+                        platformBody.parentObject.onHit(score);
+                    }
                 }
             }
         }
@@ -108,7 +119,7 @@ export async function init() {
     Matter.World.add(world, ground);
 
     player = new Player(UI.canvas.width / 2, UI.canvas.height - 100, userAvatarImg, world, { restitution });
-    platformManager = new PlatformManager(UI.canvas.width, UI.canvas.height, platformImg, world, { restitution });
+    platformManager = new PlatformManager(UI.canvas.width, UI.canvas.height, platformImages, world, { restitution });
     platformManager.generateInitialPlatforms();
     replay = new Replay();
     camera = new Camera(UI.canvas.height);
@@ -159,7 +170,7 @@ function update(deltaTime) {
         }
     }
 
-    platformManager.update(cameraY, player.body.position.y);
+    platformManager.update(cameraY, player.body.position.y, score);
     
     if (!inSafeZone && player.body.position.y > cameraY + UI.canvas.height + player.height) {
         gameState = 'gameOver';
@@ -199,7 +210,15 @@ function drawReplay(deltaTime) {
     UI.replayCtx.translate(0, -frame.cameraY);
 
     for (const p of frame.platforms) {
-        UI.replayCtx.drawImage(platformImg, p.x, p.y, p.width, p.height);
+        let pImg = platformImages.normal;
+        if (p.isBreakable) {
+            if (p.maxHits === 1 && p.hits === 1) pImg = platformImages.cracked2;
+            else if (p.maxHits > 1) {
+                if (p.hits === 1) pImg = platformImages.cracked1;
+                else if (p.hits >= 2) pImg = platformImages.cracked2;
+            }
+        }
+        UI.replayCtx.drawImage(pImg, p.x, p.y, p.width, p.height);
     }
 
     if (frame.ground && groundImg.complete) {
@@ -248,4 +267,3 @@ export function createAudioContext() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 }
-
